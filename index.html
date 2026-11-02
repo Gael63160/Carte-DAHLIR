@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carte ruralité AURA – DAHLIR</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1b1f24; --muted: #5b6570; --line: #d9dee3;
+    --panel: #f6f8fa; --accent: #1d4ed8;
+    --frr: #2e7d32; --frrplus: #145a1a; --qpv: #c2410c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #14181d; --fg: #e8ecf0; --muted: #9aa5b1; --line: #2b323a; --panel: #1b2027; --accent: #7aa2ff; }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--fg); background: var(--bg); display: flex; flex-direction: column; }
+  header { padding: 10px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  header h1 { font-size: 18px; margin: 0; }
+  header span { color: var(--muted); font-size: 13px; }
+  main { flex: 1; display: flex; min-height: 0; }
+  aside { width: 340px; max-width: 42vw; overflow-y: auto; border-right: 1px solid var(--line); background: var(--panel); padding: 14px; }
+  #map { flex: 1; min-width: 0; }
+  fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 0 0 12px; padding: 8px 10px 10px; }
+  legend { font-weight: 600; font-size: 13px; padding: 0 4px; }
+  label { display: flex; align-items: center; gap: 8px; margin: 4px 0; cursor: pointer; }
+  select, input[type=search] { width: 100%; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit; margin-top: 4px; }
+  .sw { display: inline-block; width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.35); flex: none; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+  .stat { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; text-align: center; }
+  .stat b { display: block; font-size: 20px; }
+  .stat small { color: var(--muted); font-size: 11px; }
+  button { font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  ul#liste { list-style: none; margin: 8px 0 0; padding: 0; }
+  ul#liste li { border-bottom: 1px solid var(--line); padding: 6px 0; cursor: pointer; }
+  ul#liste li:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+  ul#liste small { color: var(--muted); display: block; }
+  .badge { display: inline-block; font-size: 11px; padding: 0 6px; border-radius: 10px; border: 1px solid var(--line); margin-right: 4px; background: var(--bg); }
+  #alerte { display: none; margin: 0 0 12px; padding: 8px 10px; border: 1px solid #b45309; background: #fef3c7; color: #5b3a05; border-radius: 8px; font-size: 13px; }
+  .note { color: var(--muted); font-size: 12px; margin-top: 10px; }
+  .leaflet-popup-content h3 { margin: 0 0 4px; font-size: 15px; }
+  .leaflet-popup-content p { margin: 4px 0; }
+  @media (max-width: 760px) {
+    main { flex-direction: column-reverse; }
+    aside { width: 100%; max-width: none; height: 45%; border-right: 0; border-top: 1px solid var(--line); }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Carte ruralité – Auvergne-Rhône-Alpes</h1>
+  <span>Zonages FRR / FRR+ (ex-ZRR), quartiers prioritaires (QPV) et actions du DAHLIR</span>
+</header>
+<main>
+  <aside aria-label="Filtres et liste des actions">
+    <div id="alerte" role="alert"></div>
+
+    <div class="stats" aria-live="polite">
+      <div class="stat"><b id="n-total">–</b><small>actions affichées</small></div>
+      <div class="stat"><b id="n-frr">–</b><small>en zone FRR</small></div>
+      <div class="stat"><b id="n-qpv">–</b><small>en QPV</small></div>
+    </div>
+
+    <fieldset>
+      <legend>Couches</legend>
+      <label><input type="checkbox" id="c-frr" checked><span class="sw" style="background:var(--frr)"></span>FRR (France Ruralités Revitalisation)</label>
+      <label><input type="checkbox" id="c-frrplus" checked><span class="sw" style="background:var(--frrplus)"></span>FRR+ (niveau renforcé)</label>
+      <label><input type="checkbox" id="c-qpv" checked><span class="sw" style="background:var(--qpv)"></span>QPV (quartiers prioritaires)</label>
+      <label><input type="checkbox" id="c-actions" checked><span class="sw" style="background:var(--accent);border-radius:50%"></span>Actions du DAHLIR</label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Filtrer les actions</legend>
+      <label for="f-q" style="display:block">Recherche
+        <input type="search" id="f-q" placeholder="titre, commune, partenaire…"></label>
+      <label for="f-type" style="display:block;margin-top:8px">Type d'action
+        <select id="f-type"><option value="">Tous les types</option></select></label>
+      <label for="f-zone" style="display:block;margin-top:8px">Localisation
+        <select id="f-zone">
+          <option value="">Partout</option>
+          <option value="zonees">Seulement en zone FRR, FRR+ ou QPV</option>
+          <option value="FRR">En zone FRR (hors FRR+)</option>
+          <option value="FRR+">En zone FRR+</option>
+          <option value="QPV">En QPV</option>
+          <option value="hors">Hors zonages</option>
+        </select></label>
+      <label for="f-dep" style="display:block;margin-top:8px">Département
+        <select id="f-dep"><option value="">Tous</option></select></label>
+    </fieldset>
+
+    <button id="export" type="button">Exporter la sélection (CSV)</button>
+    <ul id="liste" aria-label="Actions"></ul>
+
+    <p class="note">Sources : zonage FRR/FRR+ (DGCL), géographie prioritaire QPV (ANCT), contours communaux (IGN via geo.api.gouv.fr), fonds de carte © contributeurs OpenStreetMap. Les actions DAHLIR proviennent du fichier <code>data/actions_dahlir.csv</code>.</p>
+  </aside>
+  <div id="map" role="application" aria-label="Carte interactive"></div>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
